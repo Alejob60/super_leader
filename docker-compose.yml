@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: super_leader
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d super_leader"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  orchestrator:
+    build:
+      context: ./orchestrator
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://admin:admin123@postgres:5432/super_leader?sslmode=disable
+      REDIS_URL: redis://redis:6379
+      ISSUING_SERVICE_URL: http://issuing-service:5000
+      PSP_WEBHOOK_SECRET: test-secret-hmac
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  issuing-service:
+    build:
+      context: ./issuing-service
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      IssuingService__LegacyEndpoint: http://simulator:9090/issue
+
+  console:
+    build:
+      context: ./console
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://orchestrator:8080
+
+  simulator:
+    build:
+      context: ./simulator
+      dockerfile: Dockerfile
+    ports:
+      - "9090:9090"
+    environment:
+      CHAOS_DUPLICATE_RATE: "0.10"
+      CHAOS_INVALID_FORMAT_RATE: "0.05"
+      CHAOS_ISSUER_LATENCY_MIN: "100"
+      CHAOS_ISSUER_LATENCY_MAX: "3000"
+      CHAOS_ISSUER_TIMEOUT_RATE: "0.15"
+      CHAOS_ISSUER_DOWN_DURATION: "30"
+
+volumes:
+  postgres_data:
