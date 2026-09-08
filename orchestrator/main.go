@@ -84,10 +84,14 @@ func getEnv(key, defaultValue string) string {
 
 func runMigrations(db *sql.DB) error {
 	migrationSQL := `
-	CREATE TYPE order_status AS ENUM (
-		'CREATED', 'QUOTED', 'PAYMENT_PENDING', 'PAID', 'ISSUING', 'ISSUED',
-		'PAYMENT_FAILED', 'ISSUING_FAILED', 'REFUND_REQUIRED', 'CANCELLED'
-	);
+	DO $$ BEGIN
+		CREATE TYPE order_status AS ENUM (
+			'CREATED', 'QUOTED', 'PAYMENT_PENDING', 'PAID', 'ISSUING', 'ISSUED',
+			'PAYMENT_FAILED', 'ISSUING_FAILED', 'REFUND_REQUIRED', 'CANCELLED'
+		);
+	EXCEPTION
+		WHEN duplicate_object THEN null;
+	END $$;
 
 	CREATE TABLE IF NOT EXISTS orders (
 		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

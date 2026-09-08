@@ -35,6 +35,9 @@ services:
       DATABASE_URL: postgres://admin:admin123@postgres:5432/super_leader?sslmode=disable
       REDIS_URL: redis://redis:6379
       ISSUING_SERVICE_URL: http://issuing-service:5000
+      QUOTE_SERVICE_URL: http://simulator:9090
+      PAYMENT_SERVICE_URL: http://simulator:9090
+      ISSUER_SERVICE_URL: http://simulator:9090
       PSP_WEBHOOK_SECRET: test-secret-hmac
     depends_on:
       postgres:

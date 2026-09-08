@@ -33,19 +33,19 @@ func (r *OrderRepository) Create(order *domain.Order) error {
 func (r *OrderRepository) FindByID(id string) (*domain.Order, error) {
 	query := `
 		SELECT id, idempotency_key, status, plate, vehicle_year, city_code, document_id,
-			   quote_id, premium, currency, valid_until, payment_id, payment_status,
-			   policy_number, external_ref, correlation_id, created_at, updated_at,
-			   last_retry_at, retry_count
+			   COALESCE(quote_id, ''), COALESCE(premium, 0), COALESCE(currency, 'COP'), 
+			   valid_until, COALESCE(payment_id, ''), COALESCE(payment_status, ''),
+			   COALESCE(policy_number, ''), COALESCE(external_ref, ''), correlation_id, 
+			   created_at, updated_at, last_retry_at, retry_count
 		FROM orders WHERE id = $1`
 	
 	order := &domain.Order{}
 	var validUntil, lastRetryAt sql.NullTime
-	var premium sql.NullFloat64
 	
 	err := r.db.QueryRow(query, id).Scan(
 		&order.ID, &order.IdempotencyKey, &order.Status,
 		&order.Plate, &order.VehicleYear, &order.CityCode, &order.DocumentID,
-		&order.QuoteID, &premium, &order.Currency, &validUntil,
+		&order.QuoteID, &order.Premium, &order.Currency, &validUntil,
 		&order.PaymentID, &order.PaymentStatus,
 		&order.PolicyNumber, &order.ExternalRef, &order.CorrelationID,
 		&order.CreatedAt, &order.UpdatedAt,
@@ -63,9 +63,6 @@ func (r *OrderRepository) FindByID(id string) (*domain.Order, error) {
 	}
 	if lastRetryAt.Valid {
 		order.LastRetryAt = &lastRetryAt.Time
-	}
-	if premium.Valid {
-		order.Premium = premium.Float64
 	}
 	
 	return order, nil
@@ -97,6 +94,48 @@ func (r *OrderRepository) UpdateIssuing(id string, policyNumber string, external
 	query := `UPDATE orders SET policy_number = $1, external_ref = $2, updated_at = NOW() WHERE id = $3`
 	_, err := r.db.Exec(query, policyNumber, externalRef, id)
 	return err
+}
+
+func (r *OrderRepository) FindOrdersByPaymentID(paymentID string) ([]domain.Order, error) {
+	query := `
+		SELECT id, idempotency_key, status, plate, vehicle_year, city_code, document_id,
+			   COALESCE(quote_id, ''), COALESCE(premium, 0), COALESCE(currency, 'COP'), 
+			   valid_until, COALESCE(payment_id, ''), COALESCE(payment_status, ''),
+			   COALESCE(policy_number, ''), COALESCE(external_ref, ''), correlation_id, 
+			   created_at, updated_at, last_retry_at, retry_count
+		FROM orders WHERE payment_id = $1`
+	
+	rows, err := r.db.Query(query, paymentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var orders []domain.Order
+	for rows.Next() {
+		var o domain.Order
+		var validUntil, lastRetryAt sql.NullTime
+		err := rows.Scan(
+			&o.ID, &o.IdempotencyKey, &o.Status,
+			&o.Plate, &o.VehicleYear, &o.CityCode, &o.DocumentID,
+			&o.QuoteID, &o.Premium, &o.Currency, &validUntil,
+			&o.PaymentID, &o.PaymentStatus,
+			&o.PolicyNumber, &o.ExternalRef, &o.CorrelationID,
+			&o.CreatedAt, &o.UpdatedAt,
+			&lastRetryAt, &o.RetryCount,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if validUntil.Valid {
+			o.ValidUntil = &validUntil.Time
+		}
+		if lastRetryAt.Valid {
+			o.LastRetryAt = &lastRetryAt.Time
+		}
+		orders = append(orders, o)
+	}
+	return orders, nil
 }
 
 func (r *OrderRepository) FindStuckOrders(threshold time.Duration) ([]domain.Order, error) {
