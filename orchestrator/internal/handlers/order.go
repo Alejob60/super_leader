@@ -109,9 +109,17 @@ func (h *OrderHandler) GetOrder(c *gin.Context) {
 func (h *OrderHandler) ListOrders(c *gin.Context) {
 	status := c.Query("status")
 	search := c.Query("search")
-	_ = status
-	_ = search
-	c.JSON(http.StatusOK, []domain.Order{})
+	
+	orders, _, err := h.repo.ListAll(status, search, 50, 0)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	
+	if orders == nil {
+		orders = []domain.Order{}
+	}
+	c.JSON(http.StatusOK, orders)
 }
 
 func (h *OrderHandler) RetryIssuing(c *gin.Context) {

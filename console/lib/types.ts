@@ -42,16 +42,16 @@ export interface TimelineEvent {
 }
 
 export const STATUS_COLORS: Record<OrderStatus, string> = {
-  CREATED: 'bg-gray-100 text-gray-800',
-  QUOTED: 'bg-blue-100 text-blue-800',
-  PAYMENT_PENDING: 'bg-yellow-100 text-yellow-800',
-  PAID: 'bg-green-100 text-green-800',
-  ISSUING: 'bg-purple-100 text-purple-800',
-  ISSUED: 'bg-green-100 text-green-800',
-  PAYMENT_FAILED: 'bg-red-100 text-red-800',
-  ISSUING_FAILED: 'bg-red-100 text-red-800',
-  REFUND_REQUIRED: 'bg-orange-100 text-orange-800',
-  CANCELLED: 'bg-gray-100 text-gray-500',
+  CREATED: 'bg-slate-500/20 text-slate-300 border border-slate-500/30',
+  QUOTED: 'bg-blue-500/20 text-blue-300 border border-blue-500/30',
+  PAYMENT_PENDING: 'bg-amber-500/20 text-amber-300 border border-amber-500/30',
+  PAID: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
+  ISSUING: 'bg-purple-500/20 text-purple-300 border border-purple-500/30',
+  ISSUED: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
+  PAYMENT_FAILED: 'bg-red-500/20 text-red-300 border border-red-500/30',
+  ISSUING_FAILED: 'bg-red-500/20 text-red-300 border border-red-500/30',
+  REFUND_REQUIRED: 'bg-orange-500/20 text-orange-300 border border-orange-500/30',
+  CANCELLED: 'bg-slate-500/20 text-slate-400 border border-slate-500/30',
 };
 
 export const STATUS_LABELS: Record<OrderStatus, string> = {

@@ -78,6 +78,82 @@ func (r *OrderRepository) FindByIdempotencyKey(key string) (*domain.Order, error
 	return r.FindByID(id)
 }
 
+func (r *OrderRepository) ListAll(status, search string, limit, offset int) ([]domain.Order, int, error) {
+	countQuery := "SELECT COUNT(*) FROM orders WHERE 1=1"
+	query := `
+		SELECT id, idempotency_key, status, plate, vehicle_year, city_code, document_id,
+			   COALESCE(quote_id, ''), COALESCE(premium, 0), COALESCE(currency, 'COP'), 
+			   valid_until, COALESCE(payment_id, ''), COALESCE(payment_status, ''),
+			   COALESCE(policy_number, ''), COALESCE(external_ref, ''), correlation_id, 
+			   created_at, updated_at, last_retry_at, retry_count
+		FROM orders WHERE 1=1`
+	
+	args := []interface{}{}
+	argIdx := 1
+
+	if status != "" {
+		countQuery += fmt.Sprintf(" AND status = $%d", argIdx)
+		query += fmt.Sprintf(" AND status = $%d", argIdx)
+		args = append(args, status)
+		argIdx++
+	}
+	if search != "" {
+		countQuery += fmt.Sprintf(" AND (plate ILIKE $%d OR document_id ILIKE $%d OR id::text ILIKE $%d)", argIdx, argIdx, argIdx)
+		query += fmt.Sprintf(" AND (plate ILIKE $%d OR document_id ILIKE $%d OR id::text ILIKE $%d)", argIdx, argIdx, argIdx)
+		args = append(args, "%"+search+"%")
+		argIdx++
+	}
+
+	var total int
+	if err := r.db.QueryRow(countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	query += " ORDER BY created_at DESC"
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT $%d", argIdx)
+		args = append(args, limit)
+		argIdx++
+	}
+	if offset > 0 {
+		query += fmt.Sprintf(" OFFSET $%d", argIdx)
+		args = append(args, offset)
+		argIdx++
+	}
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var orders []domain.Order
+	for rows.Next() {
+		var o domain.Order
+		var validUntil, lastRetryAt sql.NullTime
+		err := rows.Scan(
+			&o.ID, &o.IdempotencyKey, &o.Status,
+			&o.Plate, &o.VehicleYear, &o.CityCode, &o.DocumentID,
+			&o.QuoteID, &o.Premium, &o.Currency, &validUntil,
+			&o.PaymentID, &o.PaymentStatus,
+			&o.PolicyNumber, &o.ExternalRef, &o.CorrelationID,
+			&o.CreatedAt, &o.UpdatedAt,
+			&lastRetryAt, &o.RetryCount,
+		)
+		if err != nil {
+			return nil, 0, err
+		}
+		if validUntil.Valid {
+			o.ValidUntil = &validUntil.Time
+		}
+		if lastRetryAt.Valid {
+			o.LastRetryAt = &lastRetryAt.Time
+		}
+		orders = append(orders, o)
+	}
+	return orders, total, nil
+}
+
 func (r *OrderRepository) UpdateStatus(id string, status domain.OrderStatus) error {
 	query := `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2`
 	_, err := r.db.Exec(query, status, id)
